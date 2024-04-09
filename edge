@@ -1,0 +1,26 @@
+
+
+public class Edge {
+    int v, w;
+    String type;
+    int bandwidth;
+    int length;
+    int propDelay;
+
+    public Edge(int v, int w, String type, int bandwidth, int length){
+        this.v = v;
+        this.w = w;
+        this.type = type;
+        this.bandwidth = bandwidth;
+        this.length = length;
+        this.propDelay = getPropDelay(type,length);
+    }
+
+    public int getPropDelay(String type, int length){
+        if(type.charAt(0) == 'o'){  // "optical"
+            return length*23;
+        } else{                     // "copper" is faster, delay is small
+            return length*20;
+        }
+    }
+}
