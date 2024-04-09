@@ -1,0 +1,246 @@
+
+
+//https://algs4.cs.princeton.edu/43mst/UF.java.html
+//https://algs4.cs.princeton.edu/43mst/KruskalMST.java.html
+//https://algs4.cs.princeton.edu/41graph/NonrecursiveDFS.java.html for copper
+//https://algs4.cs.princeton.edu/43mst/EdgeWeightedGraph.java.html
+//https://algs4.cs.princeton.edu/43mst/Edge.java.html
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Scanner;
+
+public class NetAnalysis implements NetAnalysis_Inter{
+    private ArrayList<ArrayList<Edge>> adjList;
+
+    public NetAnalysis(String filename){
+        adjList = new ArrayList<>();
+        try {
+            File file = new File(filename);
+            Scanner scanner = new Scanner(file);
+
+            int vertices = scanner.nextInt();
+            for(int i=0;i<vertices;i++){
+                adjList.add(new ArrayList<>());
+            }
+
+            while (scanner.hasNext()){
+                int v = scanner.nextInt();
+                int w = scanner.nextInt();
+                String type = scanner.next();
+                int bandwidth = scanner.nextInt();
+                int length = scanner.nextInt();
+
+                if(v < 0 || v >= vertices || w<0 || w>= vertices){
+                    adjList.clear();
+                    return;
+                }
+
+                Edge e1 = new Edge(v,w,type,bandwidth,length);
+                adjList.get(v).add(e1);
+                Edge e2 = new Edge(w,v,type,bandwidth,length);
+                adjList.get(w).add(e2);
+            }
+            scanner.close();
+        }catch(Exception e){
+            adjList.clear();
+        }
+    }
+
+    @Override
+    public ArrayList<Integer> lowestLatencyPath(int u, int w){
+        int[] dist = new int[adjList.size()];
+        int[] prev = new int[adjList.size()];
+        boolean[] visited = new boolean[adjList.size()];
+
+        for(int i=0;i<dist.length;i++){
+            dist[i] = Integer.MAX_VALUE/2 - 10;
+            visited[i]= false;
+        }
+        dist[u] = 0;
+        for(int i=0;i<adjList.size();i++){
+            int v = -1;
+            for(int j=0;j<adjList.size();j++){
+                if(!visited[j] && (v == -1 || dist[j]<dist[v])){
+                    v=j;
+                }
+            }// find v s.t. dist[v] is minimum
+
+            if(v == -1){
+                break;
+            }
+
+            visited[v] = true;
+
+            for(Edge edge : adjList.get(v)){
+                int next = edge.w;
+                int latency = edge.propDelay;
+                if(dist[v]+latency < dist[next]){
+                    dist[next] = dist[v] + latency;
+                    prev[next] = v;
+                }
+            }
+        }
+
+        if(dist[w] == Integer.MAX_VALUE/2 - 10){
+            return null;
+        }
+
+        ArrayList<Integer> path = new ArrayList<>();
+        for(int vet = w; vet!=u;vet = prev[vet]){
+            path.add(vet);
+        }
+        if(path.size() == 0){
+            return null;
+        }
+        path.add(u);
+
+        reverseArrayList(path);
+
+        return path;
+    }
+
+    public static void reverseArrayList(ArrayList<Integer> list){
+        int size  = list.size();
+        for(int i=0;i<size/2;i++){
+            int left = list.get(i);
+            int right = list.get(size-1-i);
+            list.set(i,right);
+            list.set(size-1-i,left);
+        }
+    }
+
+    @Override
+    public int bandwidthAlongPath(ArrayList<Integer> path) throws IllegalArgumentException{
+        if(path == null || path.size() < 2){
+            throw new IllegalArgumentException();
+        }
+        int minBandwidth =  Integer.MAX_VALUE;
+        for(int i=0;i<path.size()-1;i++){
+            int u = path.get(i);
+            int v = path.get(i+1);
+            Edge edge = findEdge(u,v);
+            if(edge == null){
+                throw new IllegalArgumentException();
+            }
+            if(minBandwidth > edge.bandwidth){
+                minBandwidth = edge.bandwidth;
+            }
+        }
+        return minBandwidth;
+    }
+
+    private Edge findEdge(int u,int v){
+        for(Edge edge:adjList.get(u)){
+            if(edge.w == v){
+                return edge;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean copperOnlyConnected(){
+        boolean[] visited = new boolean[adjList.size()];
+        for(int t=0;t<visited.length;t++){
+            visited[t] = false;
+        }
+
+        dfsCopperOnly(0,visited);
+
+        for (boolean v : visited) {
+            if (!v) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void dfsCopperOnly(int v, boolean[] visited){
+        visited[v] = true;
+        for(Edge edge: adjList.get(v)){
+            if(edge.type.equals("copper")){
+                int next = edge.w;
+                if(!visited[next]){
+                    //
+                    dfsCopperOnly(next, visited);
+                    // System.out.println(next + "is visited");
+                }
+            }
+        }
+    }
+
+    @Override
+    public boolean connectedTwoVertFail(){
+        int n = adjList.size();
+        if(n<=2){
+            return false;
+        }
+
+        boolean[] visited = new boolean[adjList.size()];
+
+        for(int i=0;i<n;i++){
+            for(int j=i+1;j<n;j++){
+                int start = (i==0)? 1:0;
+                if(start==1 && j==1){
+                    start = 2;
+                }
+
+                for(int t=0;t<visited.length;t++){
+                    visited[t] = false;
+                }
+
+                visited[i] = true;
+                visited[j] = true;
+
+                dfs(start, visited);
+
+                for(int k=0;k<n;k++){
+                    if(!visited[k]){
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private void dfs(int v, boolean[] visited) {
+        visited[v] = true;
+        for (Edge edge : adjList.get(v)) {
+            if (!visited[edge.w]) {
+                dfs(edge.w, visited);
+            }
+        }
+    }
+
+    @Override
+    public ArrayList<STE> lowestAvgLatST(){
+        ArrayList<Edge> edges = new ArrayList<>();
+        for (ArrayList<Edge> edgeList : adjList) {
+            edges.addAll(edgeList);
+        }
+
+        for(int i=0;i<edges.size()-1;i++){
+            for(int j=0;j<edges.size()-1-i;j++){
+                if(edges.get(j).propDelay > edges.get(j+1).propDelay){
+                    Edge temp = edges.get(j);
+                    edges.set(j,edges.get(j+1));
+                    edges.set(j+1,temp);
+                }
+            }
+        }
+
+        UnionFind uf = new UnionFind(adjList.size());
+        ArrayList<STE> result = new ArrayList<>();
+        for(Edge edge:edges){
+            int u = edge.w;
+            int v = edge.v;
+            if(uf.find(u) != uf.find(v)){
+                uf.union(u,v);
+                result.add(new STE(u,v));
+            }
+        }
+        return result;
+    }
+}
